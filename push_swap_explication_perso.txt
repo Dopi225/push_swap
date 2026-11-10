@@ -1,0 +1,799 @@
+PUSH_SWAP - MON EXPLICATION PERSO (à faire à 2)
+
+On nous donne une liste d'entiers en arguments. Ils forment la pile a (le 1er argument est en haut). La pile b est vide.
+Le programme doit AFFICHER la liste d'opérations (une par ligne) qui trie a (plus petit en haut) et laisse b vide.
+On ne trie pas vraiment : on écrit la recette.
+
+Les 11 opérations (les seules autorisées) :
+sa sb ss        -> échange les 2 premiers de a / b / les deux
+pa pb           -> prend le dessus de b et le met sur a / l'inverse
+ra rb rr        -> le premier passe en dernier (rotate)
+rra rrb rrr     -> le dernier passe en premier (reverse rotate)
+(ss, rr, rrr comptent pour UNE seule opération et s'affichent sur UNE ligne)
+
+Options : --simple (O(n²)), --medium (O(n√n)), --complex (O(n log n)), --adaptive (défaut), --bench (stats sur stderr).
+Erreur (non entier, hors int, doublon) -> "Error\n" sur stderr. Aucun argument -> rien du tout.
+Objectifs : 100 nombres < 2000 (excellent < 700), 500 nombres < 12000 (excellent < 5500). Sur TOUS les tests.
+
+
+Du coup on doit faire en gros dans cet ordre :
+
+- définir la structure (liste chaînée de nodes + un contexte qui contient a, b, les compteurs, les options) => PAS de variable globale
+- parser les arguments : options d'un côté, nombres de l'autre
+- valider chaque nombre (chiffres seulement, signe optionnel, tient dans un int) et refuser les doublons
+- coder les 11 opérations (d'abord les opérations "pures" sur la pile, ensuite les versions qui affichent + comptent)
+- calculer le désordre AVANT de bouger quoi que ce soit
+- normaliser : remplacer chaque valeur par son rang (0 = plus petit, n-1 = plus grand)
+- gérer les petits cas (déjà trié, 2 éléments, 3 éléments)
+- coder l'algo simple (sélection), puis radix, puis chunks
+- coder l'adaptatif (choix selon le désordre) + les sélecteurs de stratégie
+- coder --bench (sur stderr)
+- optimiser jusqu'aux seuils du sujet, mesurer sur beaucoup de tirages aléatoires
+- free de tout (listes) à TOUTES les sorties, y compris les erreurs
+- Makefile (sans relink), norminette, valgrind
+- README
+- bonus checker seulement si TOUT le mandatory est parfait
+
+
+/* ***************** Pourquoi normaliser (remplacer par des rangs) *********************************** *\
+
+Les vrais nombres peuvent être -2000000000 ou 42. Les algos radix et chunks ont besoin de nombres de 0 à n-1.
+Exemple : [42, -7, 100, 3] devient [2, 0, 3, 1].
+Pour chaque node, index = nombre d'éléments strictement plus petits que lui (O(n²) mais hors décompte des opérations).
+Après ça, la pile est une permutation de 0..n-1 et le but devient : avoir 0,1,2,...,n-1 de haut en bas.
+
+
+/* ***************** Ma logique du désordre *********************************** *\
+
+On regarde toutes les paires (i, j) avec i avant j.
+Si a[i] > a[j] c'est une "erreur".
+disorder = erreurs / nombre de paires (entre 0.0 et 1.0).
+Piège : 0 ou 1 élément = 0 paire => division par zéro, donc on renvoie 0.0.
+
+
+/* ***************** Ma logique des 4 algos *********************************** *\
+
+1) SIMPLE O(n²) - sélection
+   tant que a a plus de 3 éléments : on cherche le plus petit, on le monte en haut par le chemin le plus court (ra ou rra), pb.
+   on trie les 3 restants, puis pa jusqu'à vider b.
+   Vérif : on a poussé 0,1,2,... donc le dessus de b est le plus grand des poussés, il revient sur a juste au-dessus
+   des 3 restants (qui sont les plus grands) => a se retrouve trié. (à dessiner avec 5 nombres pour être sûrs)
+
+2) MEDIUM O(n√n) - chunks en "fenêtre glissante"
+   pushed = nombre d'éléments déjà envoyés dans b, chunk ≈ √n (à ajuster, essayer 1x, 1.5x, 2x √n).
+   phase 1, tant que a n'est pas vide, on regarde le dessus de a :
+     - index <= pushed            -> pb puis rb (petit, on l'envoie au fond de b)
+     - index <= pushed + chunk    -> pb (il reste en haut de b)
+     - sinon                      -> ra
+   phase 2, tant que b n'est pas vide : on monte le PLUS GRAND de b en haut (rb ou rrb, chemin court), pa.
+   a se remplit du plus grand au plus petit => trié à la fin.
+   Pourquoi ça finit : le plus petit index restant est toujours <= pushed, donc on pousse toujours quelque chose.
+
+3) COMPLEX O(n log n) - radix binaire (LSD)
+   max_bits = nombre de bits de (n-1).
+   pour chaque bit : n fois, on regarde le dessus de a :
+     bit à 0 -> pb ; bit à 1 -> ra
+   puis on pa tout b. Chaque passe est stable, donc après le dernier bit tout est trié.
+   Coût ≈ max_bits * 2n. Pour 500 : 9 * ~1000 = ~9000 (sous 12000 donc ça passe, mais pas "excellent").
+
+4) ADAPTIVE
+   désordre < 0.2  -> méthode O(n²)
+   0.2 <= d < 0.5  -> méthode O(n√n)
+   d >= 0.5        -> méthode O(n log n)
+   Version de base : on appelle simple / medium / complex.
+   Version à améliorer pour les benchmarks : dans chaque régime utiliser une méthode plus maligne
+   (ex. garder dans a la plus longue suite croissante et ne déplacer que les autres, ou insertion au moindre coût).
+   Les seuils 0.2 / 0.5 sont imposés : dans le README on justifie POURQUOI chaque méthode va avec chaque zone
+   + argument de complexité (temps et espace) en nombre d'opérations push_swap.
+
+
+/* ***************** Les fonctions dont on aura besoin *********************************** *\
+
+-fonction pour convertir une string en int avec détection d'erreur (ft_atoi_safe)
+-fonction qui détecte une option (--simple, --medium, --complex, --adaptive, --bench)
+-fonction qui ajoute un node à la fin de a (add_back)
+-fonction qui vérifie les doublons
+-fonction parse_args qui rassemble tout ça et remplit le contexte
+-4 fonctions "pures" : swap_top, push_top, rotate_up, rotate_down (modifient la pile, n'affichent rien)
+-11 fonctions d'opérations : sa, sb, ss, pa, pb, ra, rb, rr, rra, rrb, rrr (appellent les pures + log_op)
+-log_op : affiche le nom de l'op et incrémente les compteurs
+-compute_disorder
+-normalize (rangs)
+-stack_size, is_sorted, pos_of_min, pos_of_max
+-rot_a_to_top, rot_b_to_top (chemin le plus court)
+-sort_small (2 et 3 éléments)
+-simple_sort, medium_sort, radix_sort
+-run_strategy (choisit selon l'option / le désordre)
+-print_bench (stderr)
+-free_stack, error_exit
+-main
+
+fonctions de base : ft_strlen, ft_strcmp, ft_putstr_fd, ft_putnbr_fd (tout ce qui est écrit à la main ou via libft)
+
+
+/* ******* Le header (structures) *************************************** *\
+
+typedef struct s_node
+{
+	int				value;
+	int				index;
+	struct s_node	*next;
+}	t_node;
+
+typedef enum e_op { SA, SB, SS, PA, PB, RA, RB, RR, RRA, RRB, RRR }	t_op;
+typedef enum e_strat { ADAPTIVE, SIMPLE, MEDIUM, COMPLEX }	t_strat;
+
+typedef struct s_ctx
+{
+	t_node		*a;
+	t_node		*b;
+	int			count[11];
+	int			total;
+	int			bench;
+	t_strat		strat;
+	double		disorder;
+	const char	*name;
+	const char	*cplx;
+	const char	*op_names[11];
+}	t_ctx;
+
+
+/* ******* Conversion sûre string -> int *************************************** *\
+
+(#include <limits.h> pour INT_MAX / INT_MIN, à vérifier que c'est bien autorisé, sinon écrire les valeurs en dur)
+
+int	ft_atoi_safe(const char *s, int *out)
+{
+	long	n;
+	int		sign;
+	int		i;
+
+	i = 0;
+	sign = 1;
+	if (s[i] == '-' || s[i] == '+')
+	{
+		if (s[i] == '-')
+			sign = -1;
+		i++;
+	}
+	if (!s[i])
+		return (0);
+	n = 0;
+	while (s[i])
+	{
+		if (s[i] < '0' || s[i] > '9')
+			return (0);
+		n = n * 10 + (s[i] - '0');
+		if (n * sign > INT_MAX || n * sign < INT_MIN)
+			return (0);
+		i++;
+	}
+	*out = (int)(n * sign);
+	return (1);
+}
+
+Cas à tester : "" "+" "-" "--5" "12a" "2147483648" "-2147483649" "0 0" "+0 -0" (doublon)
+
+
+/* ******* Parsing des arguments *************************************** *\
+
+int	parse_option(t_ctx *c, char *arg)
+{
+	if (!ft_strcmp(arg, "--simple"))
+		c->strat = SIMPLE;
+	else if (!ft_strcmp(arg, "--medium"))
+		c->strat = MEDIUM;
+	else if (!ft_strcmp(arg, "--complex"))
+		c->strat = COMPLEX;
+	else if (!ft_strcmp(arg, "--adaptive"))
+		c->strat = ADAPTIVE;
+	else if (!ft_strcmp(arg, "--bench"))
+		c->bench = 1;
+	else
+		return (0);
+	return (1);
+}
+
+int	add_back(t_node **a, int value)
+{
+	t_node	*n;
+	t_node	*last;
+
+	n = malloc(sizeof(t_node));
+	if (!n)
+		return (0);
+	n->value = value;
+	n->index = 0;
+	n->next = NULL;
+	if (!*a)
+	{
+		*a = n;
+		return (1);
+	}
+	last = *a;
+	while (last->next)
+		last = last->next;
+	last->next = n;
+	return (1);
+}
+
+int	has_duplicate(t_node *a)
+{
+	t_node	*j;
+
+	while (a)
+	{
+		j = a->next;
+		while (j)
+		{
+			if (j->value == a->value)
+				return (1);
+			j = j->next;
+		}
+		a = a->next;
+	}
+	return (0);
+}
+
+int	parse_args(t_ctx *c, int argc, char **argv)
+{
+	int	i;
+	int	nb;
+
+	i = 1;
+	while (i < argc)
+	{
+		if (!parse_option(c, argv[i]))
+		{
+			if (!ft_atoi_safe(argv[i], &nb) || !add_back(&c->a, nb))
+				return (0);
+		}
+		i++;
+	}
+	return (!has_duplicate(c->a));
+}
+
+Note : "--bench" est une option, mais "-5" est un nombre (un seul tiret). Une option inconnue comme "--abc" tombe dans ft_atoi_safe => Error.
+(Si on veut accepter "1 2 3" dans un seul argument entre guillemets : découper avec ft_split avant, à décider ensemble.)
+
+
+/* ******* Les opérations pures (modifient la pile, n'affichent rien) *************************************** *\
+
+void	swap_top(t_node **s)
+{
+	t_node	*first;
+	t_node	*second;
+
+	if (!*s || !(*s)->next)
+		return ;
+	first = *s;
+	second = first->next;
+	first->next = second->next;
+	second->next = first;
+	*s = second;
+}
+
+void	push_top(t_node **from, t_node **to)
+{
+	t_node	*n;
+
+	if (!*from)
+		return ;
+	n = *from;
+	*from = n->next;
+	n->next = *to;
+	*to = n;
+}
+
+void	rotate_up(t_node **s)
+{
+	t_node	*first;
+	t_node	*last;
+
+	if (!*s || !(*s)->next)
+		return ;
+	first = *s;
+	*s = first->next;
+	first->next = NULL;
+	last = *s;
+	while (last->next)
+		last = last->next;
+	last->next = first;
+}
+
+void	rotate_down(t_node **s)
+{
+	t_node	*prev;
+	t_node	*last;
+
+	if (!*s || !(*s)->next)
+		return ;
+	prev = NULL;
+	last = *s;
+	while (last->next)
+	{
+		prev = last;
+		last = last->next;
+	}
+	prev->next = NULL;
+	last->next = *s;
+	*s = last;
+}
+
+
+/* ******* Les opérations qui affichent + comptent *************************************** *\
+
+void	log_op(t_ctx *c, t_op op)
+{
+	ft_putstr_fd((char *)c->op_names[op], 1);
+	write(1, "\n", 1);
+	c->count[op]++;
+	c->total++;
+}
+
+void	sa(t_ctx *c)
+{
+	swap_top(&c->a);
+	log_op(c, SA);
+}
+
+void	ss(t_ctx *c)
+{
+	swap_top(&c->a);
+	swap_top(&c->b);
+	log_op(c, SS);          // UNE seule ligne, UN seul compte
+}
+
+void	pb(t_ctx *c)
+{
+	push_top(&c->a, &c->b);
+	log_op(c, PB);
+}
+
+void	ra(t_ctx *c)
+{
+	rotate_up(&c->a);
+	log_op(c, RA);
+}
+
+void	rra(t_ctx *c)
+{
+	rotate_down(&c->a);
+	log_op(c, RRA);
+}
+
+sb, pa, rb, rrb : même schéma. rr = rotate_up sur a ET b puis log RR. rrr pareil avec rotate_down.
+
+init des noms (à appeler dans init_ctx) :
+	c->op_names[SA] = "sa"; c->op_names[SB] = "sb"; c->op_names[SS] = "ss";
+	c->op_names[PA] = "pa"; c->op_names[PB] = "pb"; c->op_names[RA] = "ra";
+	c->op_names[RB] = "rb"; c->op_names[RR] = "rr"; c->op_names[RRA] = "rra";
+	c->op_names[RRB] = "rrb"; c->op_names[RRR] = "rrr";
+(à découper en 2 fonctions si ça dépasse 25 lignes avec le reste)
+
+IMPORTANT pour plus tard : si on affiche direct avec write, on ne peut plus fusionner "ra" + "rb" en "rr".
+Pour optimiser, on pourra stocker les ops dans un tableau/liste, les nettoyer, et afficher à la fin.
+À décider avant de trop avancer.
+
+
+/* ******* Désordre et normalisation *************************************** *\
+
+double	compute_disorder(t_node *a)
+{
+	t_node	*i;
+	t_node	*j;
+	long	mistakes;
+	long	pairs;
+
+	mistakes = 0;
+	pairs = 0;
+	i = a;
+	while (i)
+	{
+		j = i->next;
+		while (j)
+		{
+			pairs++;
+			if (i->value > j->value)
+				mistakes++;
+			j = j->next;
+		}
+		i = i->next;
+	}
+	if (pairs == 0)
+		return (0.0);
+	return ((double)mistakes / (double)pairs);
+}
+
+void	normalize(t_node *a)
+{
+	t_node	*i;
+	t_node	*j;
+
+	i = a;
+	while (i)
+	{
+		i->index = 0;
+		j = a;
+		while (j)
+		{
+			if (j->value < i->value)
+				i->index++;
+			j = j->next;
+		}
+		i = i->next;
+	}
+}
+
+
+/* ******* Petits outils sur les piles *************************************** *\
+
+int	stack_size(t_node *s)
+{
+	int	n;
+
+	n = 0;
+	while (s)
+	{
+		n++;
+		s = s->next;
+	}
+	return (n);
+}
+
+int	is_sorted(t_node *a)
+{
+	while (a && a->next)
+	{
+		if (a->index > a->next->index)
+			return (0);
+		a = a->next;
+	}
+	return (1);
+}
+
+int	pos_of_min(t_node *s)        // position (0 = haut) du plus petit index
+{
+	int	pos;
+	int	best;
+	int	min;
+
+	pos = 0;
+	best = 0;
+	min = s->index;
+	while (s)
+	{
+		if (s->index < min)
+		{
+			min = s->index;
+			best = pos;
+		}
+		pos++;
+		s = s->next;
+	}
+	return (best);
+}
+
+pos_of_max : pareil avec ">" .
+
+void	rot_a_to_top(t_ctx *c, int pos)       // chemin le plus court
+{
+	int	size;
+
+	size = stack_size(c->a);
+	if (pos <= size / 2)
+	{
+		while (pos-- > 0)
+			ra(c);
+	}
+	else
+	{
+		pos = size - pos;
+		while (pos-- > 0)
+			rra(c);
+	}
+}
+
+rot_b_to_top : pareil avec rb / rrb.
+
+
+/* ******* Petits cas (2 ou 3 éléments dans a) *************************************** *\
+
+void	sort_small(t_ctx *c)
+{
+	int	max;
+	int	size;
+
+	size = stack_size(c->a);
+	if (size == 2 && c->a->index > c->a->next->index)
+		sa(c);
+	if (size != 3)
+		return ;
+	max = pos_of_max(c->a);
+	if (max == 0)
+		ra(c);
+	else if (max == 1)
+		rra(c);
+	if (c->a->index > c->a->next->index)
+		sa(c);
+}
+
+Vérif à la main : [max,y,z] -> ra -> [y,z,max] -> sa si y>z.  [x,max,z] -> rra -> [z,x,max] -> sa si z>x.  [x,y,max] -> sa si x>y.
+
+
+/* ******* Algo SIMPLE (sélection) *************************************** *\
+
+void	simple_sort(t_ctx *c)
+{
+	while (stack_size(c->a) > 3)
+	{
+		rot_a_to_top(c, pos_of_min(c->a));
+		pb(c);
+	}
+	sort_small(c);
+	while (c->b)
+		pa(c);
+}
+
+
+/* ******* Algo MEDIUM (chunks en fenêtre glissante) *************************************** *\
+
+int	ft_sqrt(int n)
+{
+	int	i;
+
+	i = 0;
+	while (i * i <= n)
+		i++;
+	return (i - 1);
+}
+
+void	push_chunks(t_ctx *c, int chunk)
+{
+	int	pushed;
+
+	pushed = 0;
+	while (c->a)
+	{
+		if (c->a->index <= pushed)
+		{
+			pb(c);
+			rb(c);              // petit : au fond de b
+			pushed++;
+		}
+		else if (c->a->index <= pushed + chunk)
+		{
+			pb(c);
+			pushed++;
+		}
+		else
+			ra(c);
+	}
+}
+
+void	medium_sort(t_ctx *c)
+{
+	int	chunk;
+
+	chunk = ft_sqrt(stack_size(c->a)) * 2;     // à AJUSTER en testant (1x, 1.5x, 2x ...)
+	push_chunks(c, chunk);
+	while (c->b)
+	{
+		rot_b_to_top(c, pos_of_max(c->b));
+		pa(c);
+	}
+}
+
+Petit défaut à corriger plus tard : le "rb" quand b n'a qu'un élément ne sert à rien (mais reste valide).
+
+
+/* ******* Algo COMPLEX (radix binaire) *************************************** *\
+
+void	complex_sort(t_ctx *c)
+{
+	int	n;
+	int	max_bits;
+	int	bit;
+	int	i;
+
+	n = stack_size(c->a);
+	max_bits = 0;
+	while (((n - 1) >> max_bits) != 0)
+		max_bits++;
+	bit = 0;
+	while (bit < max_bits)
+	{
+		i = 0;
+		while (i++ < n)
+		{
+			if (((c->a->index >> bit) & 1) == 0)
+				pb(c);
+			else
+				ra(c);
+		}
+		while (c->b)
+			pa(c);
+		bit++;
+	}
+}
+
+Dessiner sur [3,1,2,0] (indices 3,1,2,0) pour comprendre : passe bit 0 puis bit 1.
+Amélioration facile : sortir de la boucle dès que is_sorted(a) est vrai (et b vide).
+
+
+/* ******* Choix de la stratégie (adaptive) *************************************** *\
+
+t_strat	pick_by_disorder(double d)
+{
+	if (d < 0.2)
+		return (SIMPLE);
+	if (d < 0.5)
+		return (MEDIUM);
+	return (COMPLEX);
+}
+
+void	run_strategy(t_ctx *c)
+{
+	t_strat	s;
+
+	s = c->strat;
+	c->name = "Adaptive";
+	if (s == ADAPTIVE)
+		s = pick_by_disorder(c->disorder);
+	else if (s == SIMPLE)
+		c->name = "Simple";
+	else if (s == MEDIUM)
+		c->name = "Medium";
+	else
+		c->name = "Complex";
+	c->cplx = "O(n log n)";
+	if (s == SIMPLE)
+		c->cplx = "O(n^2)";
+	else if (s == MEDIUM)
+		c->cplx = "O(n sqrt(n))";
+	if (s == SIMPLE)
+		simple_sort(c);
+	else if (s == MEDIUM)
+		medium_sort(c);
+	else
+		complex_sort(c);
+}
+(trop long pour la norme, à découper en 2 ou 3 fonctions : set_labels(), dispatch())
+
+Si désordre = 0 (déjà trié) => on n'affiche rien : is_sorted(a) vérifié avant run_strategy dans le main.
+
+
+/* ******* Le bench (stderr) *************************************** *\
+
+Format attendu :
+[bench] disorder: 49.93%
+[bench] strategy: Adaptive / O(n sqrt(n))
+[bench] total_ops: 7997
+[bench] sa: 0 sb: 0 ss: 0 pa: 500 pb: 500
+[bench] ra: 4840 rb: 1098 rr: 0 rra: 0 rrb: 1059 rrr: 0
+
+Pourcentage à 2 décimales sans printf :
+	pct = (int)(c->disorder * 10000 + 0.5);     // 0.4993 -> 4993
+	partie entière = pct / 100, décimales = pct % 100 (ajouter un '0' devant si < 10)
+Tout est écrit avec write(2, ...) donc ft_putstr_fd / ft_putnbr_fd(..., 2).
+Le bench ne s'affiche QUE si --bench est présent.
+En adaptive, le nom de stratégie affiché est "Adaptive" + la complexité de la méthode réellement choisie.
+
+
+/* ******* Main *************************************** *\
+
+int	main(int argc, char **argv)
+{
+	t_ctx	c;
+
+	if (argc < 2)
+		return (0);
+	init_ctx(&c);                          // met tout à 0 / NULL, strat = ADAPTIVE, remplit op_names
+	if (!parse_args(&c, argc, argv))
+		return (error_exit(&c));           // write(2, "Error\n", 6) + free + return (1)
+	if (!c.a)
+		return (0);
+	c.disorder = compute_disorder(c.a);    // AVANT tout mouvement
+	normalize(c.a);
+	if (!is_sorted(c.a))
+		run_strategy(&c);
+	if (c.bench)
+		print_bench(&c);
+	free_stack(&c.a);
+	free_stack(&c.b);
+	return (0);
+}
+
+Attention : si l'entrée est déjà triée, run_strategy n'est pas appelé donc name/cplx restent vides pour le bench.
+Prévoir une valeur par défaut (ex. appeler quand même set_labels).
+
+
+/* ******* Optimisations pour atteindre les seuils *************************************** *\
+
+Du plus simple au plus dur :
+1. chemin le plus court partout (ra vs rra) -> déjà fait dans rot_*_to_top
+2. fusionner ra+rb -> rr, rra+rrb -> rrr, sa+sb -> ss (il faut stocker les ops avant d'afficher)
+3. supprimer les paires inutiles (pa suivi de pb, ra suivi de rra...)
+4. traiter à part les petites piles (4 et 5 éléments : pousser les 2 plus petits, trier 3, rapatrier)
+5. régler la taille des chunks (tester plusieurs coefficients sur 100 et 500 nombres)
+6. radix en base plus grande, ou algo au "moindre coût" (calculer pour chaque élément de b le nombre de rotations
+   pour l'insérer au bon endroit dans a, puis choisir le moins cher) -> c'est ce qui donne les "excellent"
+7. pour désordre faible : garder la plus longue sous-suite croissante dans a et ne bouger que le reste
+
+Script de test (à lancer plein de fois, on veut le MAX, pas que la moyenne) :
+	for i in $(seq 1 100); do
+		ARG=$(shuf -i 0-9999 -n 500 | tr '\n' ' ')
+		./push_swap $ARG | wc -l
+	done | sort -n | tail -1
+Et vérifier "OK" avec : ./push_swap $ARG | ./checker_linux $ARG
+Tester aussi chaque option --simple --medium --complex --adaptive sur 100 et 500 (même si simple n'est pas "excellent" en O(n²)).
+
+
+/* ******* Mémoire *************************************** *\
+
+void	free_stack(t_node **s)
+{
+	t_node	*tmp;
+
+	while (*s)
+	{
+		tmp = (*s)->next;
+		free(*s);
+		*s = tmp;
+	}
+}
+
+error_exit doit libérer a (et b) avant de quitter. valgrind --leak-check=full sur les cas normaux ET les cas d'erreur.
+
+
+/* ******* Makefile *************************************** *\
+
+NAME = push_swap
+CC = cc
+CFLAGS = -Wall -Wextra -Werror
+SRC = main.c parsing.c ops_*.c ... (liste explicite des fichiers)
+OBJ = $(SRC:.c=.o)
+règles : all, $(NAME), clean, fclean, re (+ bonus pour le checker)
+Vérifier : "make" deux fois de suite ne doit rien recompiler ni relinker.
+
+
+/* ******* README (obligatoire) *************************************** *\
+
+- 1ère ligne en italique : *This project has been created as part of the 42 curriculum by login1, login2.*
+- Description
+- Instructions (compilation, exécution, options)
+- Resources (liens + COMMENT l'IA a été utilisée, pour quelles tâches)
+- Explication et justification de chaque algo (simple, medium, complex)
+- Algo adaptatif : justification des seuils 0.2 / 0.5, techniques par régime, complexité temps + espace
+- Contribution de chacun des deux
+
+
+/* ******* Bonus : checker *************************************** *\
+
+Même parsing que push_swap (mêmes erreurs), puis on lit stdin ligne par ligne (get_next_line possible).
+Chaque ligne = une op valide qu'on exécute avec les opérations PURES (sans affichage), sinon "Error" sur stderr.
+À la fin : a triée ET b vide -> "OK", sinon "KO" (stdout). Aucun argument -> rien.
+Fichiers en _bonus.c/_bonus.h + règle "bonus" dans le Makefile.
+À faire SEULEMENT quand tous les benchmarks du mandatory passent.
+
+
+/* ******* Répartition possible à 2 *************************************** *\
+
+Moi : parsing, structures, 11 opérations, Makefile, free/erreurs, simple + medium
+Mon mate : désordre, normalisation, radix, adaptatif, bench
+Ensemble : optimisations, tests, README, checker
+=> chacun relit et se fait expliquer le code de l'autre (soutenance : on doit tous les deux savoir tout expliquer).
+
+
+/* ******* Questions probables en soutenance *************************************** *\
+
+- expliquer le radix sur [3,1,2,0]
+- pourquoi normaliser en rangs ?
+- pourquoi ces seuils 0.2 / 0.5 ?
+- complexité de chaque algo en NOMBRE D'OPÉRATIONS (pas en temps CPU)
+- montrer qu'il n'y a pas de fuite (valgrind)
+- petite modif en direct (changer un seuil, ajouter une option, modifier le bench)
+
+
+Il reste : write les fonctions manquantes (sb, pa, rb, rrb, rr, rrr, pos_of_max, rot_b_to_top, init_ctx, error_exit, print_bench, ft_putnbr_fd, ft_strcmp),
+découper ce qui dépasse 25 lignes, et surtout TESTER chaque étape avant de passer à la suivante.
