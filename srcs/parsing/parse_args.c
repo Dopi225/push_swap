@@ -10,19 +10,19 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "push_swap.h"
+#include "../../includes/push_swap.h"
 
 int	parse_option(t_ctx *c, char *arg)
 {
-	if (!ft_strcmp(arg, "--simple"))
+	if (!ft_strncmp(arg, "--simple", 9))
 		c->strat = SIMPLE;
-	else if (!ft_strcmp(arg, "--medium"))
+	else if (!ft_strncmp(arg, "--medium", 9))
 		c->strat = MEDIUM;
-	else if (!ft_strcmp(arg, "--complex"))
+	else if (!ft_strncmp(arg, "--complex", 9))
 		c->strat = COMPLEX;
-	else if (!ft_strcmp(arg, "--adaptive"))
+	else if (!ft_strncmp(arg, "--adaptive", 10))
 		c->strat = ADAPTIVE;
-	else if (!ft_strcmp(arg, "--bench"))
+	else if (!ft_strncmp(arg, "--bench", 7))
 		c->bench = 1;
 	else
 		return (0);

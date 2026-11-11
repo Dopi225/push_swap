@@ -10,7 +10,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "push_swap.h"
+#include "../../includes/push_swap.h"
 
 void	rot_a_to_top(t_ctx *c, int pos)
 {
@@ -34,7 +34,7 @@ void	rot_b_to_top(t_ctx *c, int pos)
 {
 	int	size;
 
-	size = stack_size(c->a);
+	size = stack_size(c->b);
 	if (pos <= size / 2)
 	{
 		while (pos-- > 0)

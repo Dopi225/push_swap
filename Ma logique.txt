@@ -1,0 +1,301 @@
+# Ma logique
+
+## Comprehension
+
+Le but premier du projet est de ranger des nombres donnés par ordre croissant.
+Dans le projet on a deux pile(a et b). a stocke tout les chiffres donnés en parametre.
+
+Avec la pile a, on le remplit des chiffres donnés et la pile b qui est vide(nous sert a trier)
+
+A la fin, les chiffres doivent être dans l'ordre croissant, et la pile b doit etre vide.
+
+En gros on doit ranger la pile a dans l'ordre croissant des chiffres tout ça avec les 11 opérations qu'on nous donne.
+
+*Le but finale du projet est de ranger avec la plus courte combinaison possible d'opérations.*
+
+Pour réaliser le moins d'opérations possible, on nous a donné 4 strategy : simple, medium, complex et adaptatif.
+
+Avant de commencer a ranger ou utiliser une strategy, il faut calculer le desordre.
+
+le desordre c'est le truc qui permet de savoir combien d'inversion on va faire, en gros il montre comment la pile est derangé.
+
+On doit avoir calculer le desordre avant tout mouvement.
+
+Du coup en fonction du desordre et si on nous donne pas la strategy(du coup c'est adptatif), on doit choisir les strategy / comment ranger.
+
+il faut avoir un bench, qui est le resumer de tout ce qui c'est passé.
+
+le bench s'affiche sur la sortie d'erreur(2)
+
+il faut afficher les erreurs sur la sortie d'erreur (2) si le nombre donné n'est pas un entier, s'il y'a des doublons ou le nombre depasse les limites du INT.
+
+
+On doit pouvoir dire pour chaque operation combien de fois elle a été utilisé, on doit pouvoir afficher le nom de l'operation quand on l'utilise.
+On doit pouvoir aussi dire combien d'operation au total (en utilisant les 11 op mon code) a été réalisé pour ranger la pile.
+
+on doit pouvoir afficher la liste des opérations (pb, ra, rra...), une par ligne sur la sortie standard.
+
+
+Pour que le projet soit carré il faut pouvoir :
+
+- reconnaitre les options et les arguments a ranger
+- selectionner une methode de calcul en utilisant "--simple, --medium, --complex"
+- voir le bench(
+	, qui affiche le desorde en pourcentage avec 2 chiffre apres la virgule
+	, le nom de la statégie et la complexité de la strategie
+	, qui affiche le nom de l'op et le nombre de fois qu'elle est utilisée (en gros le compte de chaque op)
+	, le nombre total d'operation effectué)
+	pour activer le bench on utilise (--bench)
+- coordonner les operations dans les strategy
+
+## Réalisation
+
+j'ai diviser le projet entre 6 fichiers : algos, analysis(analyse), bench, ops(operations), parsing et stack.
+
+Vu qu'on aura beaucoup de variables et de contexte a utiliser, je pense qu'il faut definir plusieurs structure :
+
+- une structure qui englobe tout ce dont on a besoin dans ce projet (il doit contenir les piles a et b, les compteurs
+	, les options(strategy utilisé, la complexité de la strategie, le compte pour chaque operation, le nom de chaque operation, le total de toute les operations faites, le desordre, et si on affiche lbench ou pas))
+
+- une structure correct de pile(pile a et b ont la meme structure)
+
+- enumerer les strategies et les ops, ça sera plus facile l'utilisation et tout.
+
+/* ************************************* Les structures mis en place ****************************************** *\
+
+/* ***************** les structure enumerés des strategie et des operation *********************** *\
+
+typedef enum e_op { SA, SB, SS, PA, PB, RA, RB, RR, RRA, RRB, RRR }	t_op;
+
+typedef enum e_strat { ADAPTIVE, SIMPLE, MEDIUM, COMPLEX }	t_strat;
+
+dans t_op, on a toutes les opérations listées, pareil pour les stratégies dans t_strat.
+
+/* ***************** Structure de pile *********************** *\
+
+typedef struct s_node
+{
+	int				value;
+	int				index;
+	struct s_node	*next;
+}	t_node;
+
+value = la valeur a l'interieur de ce maillon.
+l'index = nous permet de savoir il doit etre a quelle place normalement quand c'est trié
+next = un pointeur sur le prochain maillon.
+
+/* ***************** Structure du projet *********************** *\
+
+typedef struct s_ctx
+{
+	t_node		*a;
+	t_node		*b;
+	int			count[11];
+	int			total;
+	int			bench;
+	t_strat		strat;
+	double		disorder;
+	const char	*name;
+	const char	*cplx;
+	const char	*op_names[11];
+}	t_ctx;
+
+a = pile a
+b = pile b
+count[11] = un tableau representant les 11 operations ou les elements du tableau recense combien de fois chaque operation a ete utilisé (par exemple, prenons SA est representé par 0 si count[0] =  10, ça veut dire SA a ete utilisé 10 fois)
+total = le nombre total d'operations
+bench = si on affiche le bench ou pas, il prend 0 ou 1(faux ou vrai afin de savoir si on affiche ou pas).
+strat = la strat utilisé
+disorder = le desordre initial dans les nombres mis dans la pile a(reste en double, on le mettra en pourcentage quand on affiche le bench)
+name = le nom de la srtategie utilisé
+cplx = la complexité de la strategie (O(n²), etc...)
+op_names = un tableau representant les 11 operations ou les elements du tableau represente le nom des 11 operations.
+
+
+### STACK
+
+Dans ce dossier on aura toute les fonctions pures qu'on va reutiliser dans d'autres fonctions.
+
+*J'ai coder les fonction de bases qui vont nous permettre de manipuler la pile sans y toucher aux valeurs.*
+
+/* ***************** stack/stack_basic.c *********************** *\
+
+int	stack_size(t_node *s)
+=> renvoie la taille de la pile(combien d'element cest contenu dans la pile)
+
+int	is_sorted(t_node *a)
+=> me dit si la pile est deja rangé ou pas
+
+void	free_stack(t_node **s)
+=> pour free les piles
+
+
+
+*Au lieu de faire presque pareil pour les 11 operations, j'ai fait des fonctions d'opérations qu'ont va pouvoir reutiliser dans les 11 ops.*
+
+/* ***************** stack/stack_ops.c *********************** *\
+
+void	swap_case(t_node **s)
+=> permet d'echanger les deux premiers elements d'une pile
+
+void	push_top(t_node **from, t_node **to)
+=> permet de mettre le premier element d'une pile en premier element d'une autre
+
+void	rotate_up(t_node **s)
+=> permet de faire monter la pile (le premier devient le dernier)
+
+void	rotate_down(t_node **s)
+=> permet de faire descendre la pile (le dernier devient le premier)
+
+
+
+*Afin de savoir quel mouvement faire, je me suis dit qu'il fallait au moins avoir la position du plus petit ou plus grand.*
+
+/* ***************** stack/stack_find.c *********************** *\
+
+int	pos_of_min(t_node *s)
+=> renvoie la vraie position du plus petit chiffre dans la pile
+
+int	pos_of_max(t_node *s)
+=> renvoie la vraie position du plus grand chiffre dans la pile
+
+
+### OPS
+
+Dans ce dossier on va retrouver toutes les 11 opérations et ce qui permet qu'il soit affiché a chaque appel.
+
+
+
+*La fonction qui permet d'afficher les noms des op quand on les utilise*
+
+/* ***************** ops/ops_log.c *********************** *\
+
+void	log_op(t_ctx *c, t_op op)
+
+
+
+*Toute les fonctions de push avec ma fonction pure push_top*
+
+/* ***************** ops/ops_push.c *********************** *\
+
+void	pa(t_ctx *c)
+void	pb(t_ctx *c)
+
+
+
+
+*Toute les fonctions de swap avec ma fonction pure swap_case*
+
+/* ***************** ops/ops_push.c *********************** *\
+
+void	sa(t_ctx *c)
+void	sb(t_ctx *c)
+void	ss(t_ctx *c)
+
+
+
+*Toute les fonctions de rotate avec ma fonction pure rotate_top*
+
+/* ***************** ops/ops_rotate.c *********************** *\
+
+void	ra(t_ctx *c)
+void	rb(t_ctx *c)
+void	rr(t_ctx *c)
+
+
+
+
+*Toute les fonctions de reverse rotate avec ma fonction pure rotate_down*
+
+/* ***************** ops/ops_rev_rotate.c *********************** *\
+
+void	rra(t_ctx *c)
+void	rrb(t_ctx *c)
+void	rrr(t_ctx *c)
+
+
+
+### ANALYSIS
+
+Dans ce dossier on trouvera la fonction pour calculer le desordre et pour pouvoir faire la normalisation.
+
+La normalisation c'est le fait de remplir index de la structure de la pile(pas du projet) de la position normale qu'elle doit avoir quand elle est triée
+
+
+*La fonction pour calculer le desordre*
+
+/* ***************** analysis/disorder.c *********************** *\
+
+double	compute_disorder(t_node *a)
+=>
+	i : Parcourt la pile et représente le premier élément de la comparaison.
+	j : Parcourt les éléments qui suivent i.
+	mistakes : Compte le nombre d'inversions trouvées.
+	pairs : Compte le nombre total de comparaisons effectuées.
+
+
+*La fonction pour faire la normalisation*
+
+/* ***************** analysis/normalize.c *********************** *\
+
+void	normalize(t_node *a)
+=>
+	i : Parcourt chaque maillon dont on veut calculer l'index.
+	j : Parcourt toute la pile pour comparer les valeurs avec celle de i.
+Presque meme logique que la fonction du desordre, juste au lieu de compter les inversions qu'on peut faire, on calcule les index.
+
+
+
+### PARSING
+
+Ici j'ai rassembler toutes les fonctions liées aux parsing des entrées terminal, a l'initialisation de la structure du projet.
+
+/* ***************** parsing/init_ctx.c *********************** *\
+
+void	init_ops(t_ctx *c)
+=> permet d'initialiser les noms des operation dans le t_ctx.
+
+int	error_exit(t_ctx *c)
+=> libere les deux piles (t_node) dans le t_ctx
+
+void	init_ctx(t_ctx *c)
+=> permet d'initialiser correctement le t_ctx
+
+t_ctx : la structure du projet.
+
+
+
+
+/* ***************** parsing/parse_utils.c *********************** *\
+
+int	ft_atoi_safe(const char *s, int *out)
+=> permet de convertir un chiffre donné sous string (char *s) en chiffre (int)  et le mettre dans une variable (int *out)
+
+int	add_back(t_node **a, int value)
+=> permet d'ajouter la valeur à la fin de la pile
+
+int	has_duplicate(t_node *a)
+=> permet de savoir s'il y'a pas de doublons dans les chiffres donnés
+
+
+
+
+/* ***************** parsing/parse_args.c *********************** *\
+
+int	parse_option(t_ctx *c, char *arg)
+=> permet de retrouver les options sur le terminal, voir si on demande a voir le bench
+	en gros, repere les --bench, --simple, --medium, etc...
+
+
+int	parse_args(t_ctx *c, int argc, char **argv)
+=> decoupe tout ce qui est donné, initialise les strat, le bench, transformer les chiffres et les ajoute a la pile a
+
+
+
+### BENCH
+
+
+
+
+
+### ALGOS

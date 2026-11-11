@@ -9,7 +9,7 @@
 /*   Updated: 2026/11/10 12:56:40 by boadopo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
-#include "push_swap.h"
+#include "../../includes/push_swap.h"
 
 void	rra(t_ctx *c)
 {
@@ -23,7 +23,7 @@ void	rrb(t_ctx *c)
 	log_op(c, RRB);
 }
 
-void	rr(t_ctx *c)
+void	rrr(t_ctx *c)
 {
 	rotate_down(&c->a);
 	rotate_down(&c->b);
