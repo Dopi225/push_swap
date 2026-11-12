@@ -6,11 +6,12 @@
 /*   By: boadopo <boadopo@student.42angouleme.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/11/12 09:08:14 by boadopo           #+#    #+#             */
-/*   Updated: 2026/11/12 09:08:15 by boadopo          ###   ########.fr       */
+/*   Updated: 2026/11/12 14:31:51 by boadopo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "./includes/push_swap.h"
+#include <stdio.h>
 
 int	main(int argc, char **argv)
 {
