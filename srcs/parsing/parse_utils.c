@@ -12,6 +12,13 @@
 
 #include "../../includes/push_swap.h"
 
+int	negatif(char c)
+{
+	if (c == '-')
+		return (-1);
+	return (1)
+}
+
 int	ft_atoi_safe(const char *s, int *out)
 {
 	long	n;
@@ -19,13 +26,9 @@ int	ft_atoi_safe(const char *s, int *out)
 	int		i;
 
 	i = 0;
-	sign = 1;
-	if (s[i] == '-' || s[i] == '+')
-	{
-		if (s[i] == '-')
-			sign = -1;
+	sign = 1 * negatif(s[i]);
+	if (c == '-' || c == '+')
 		i++;
-	}
 	if (!s[i])
 		return (0);
 	n = 0;
