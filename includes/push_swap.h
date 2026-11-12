@@ -6,7 +6,7 @@
 /*   By: boadopo <boadopo@student.42angouleme.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/11/12 09:08:37 by boadopo           #+#    #+#             */
-/*   Updated: 2026/11/12 09:57:45 by boadopo          ###   ########.fr       */
+/*   Updated: 2026/11/12 17:08:00 by boadopo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -97,6 +97,7 @@ void	rot_a_to_top(t_ctx *c, int pos);
 void	rot_b_to_top(t_ctx *c, int pos);
 void	sort_small(t_ctx *c);
 void	simple_sort(t_ctx *c);
+void	medium_sort(t_ctx *c);
 void	run_strategy(t_ctx *c);
 t_strat	pick_by_disorder(double d);
 void	print_bench(t_ctx *c);
