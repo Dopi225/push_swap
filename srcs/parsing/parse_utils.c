@@ -1,17 +1,16 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   stack_utils.c                                      :+:      :+:    :+:   */
+/*   parse_utils.c                                      :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: boadopo <boadopo@student.42angouleme.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/11/10 13:14:53 by boadopo           #+#    #+#             */
-/*   Updated: 2026/11/10 13:14:53 by boadopo          ###   ########.fr       */
+/*   Updated: 2026/11/12 09:53:04 by boadopo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/push_swap.h"
-
 
 int	ft_atoi_safe(const char *s, int *out)
 {
@@ -42,7 +41,6 @@ int	ft_atoi_safe(const char *s, int *out)
 	*out = (int)(n * sign);
 	return (1);
 }
-
 
 int	add_back(t_node **a, int value)
 {

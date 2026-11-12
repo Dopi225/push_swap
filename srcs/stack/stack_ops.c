@@ -6,7 +6,7 @@
 /*   By: boadopo <boadopo@student.42angouleme.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/11/10 13:10:44 by boadopo           #+#    #+#             */
-/*   Updated: 2026/11/10 13:10:44 by boadopo          ###   ########.fr       */
+/*   Updated: 2026/11/12 09:49:54 by boadopo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -56,7 +56,6 @@ void	rotate_down(t_node **s)
 	last->next = *s;
 	*s = last;
 }
-
 
 void	rotate_up(t_node **s)
 {
