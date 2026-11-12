@@ -6,17 +6,17 @@
 /*   By: boadopo <boadopo@student.42angouleme.fr    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/11/10 13:14:53 by boadopo           #+#    #+#             */
-/*   Updated: 2026/11/12 09:53:04 by boadopo          ###   ########.fr       */
+/*   Updated: 2026/11/12 15:18:56 by boadopo          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/push_swap.h"
 
-int	negatif(char c)
+static int	negatif(char c)
 {
 	if (c == '-')
 		return (-1);
-	return (1)
+	return (1);
 }
 
 int	ft_atoi_safe(const char *s, int *out)
@@ -27,7 +27,7 @@ int	ft_atoi_safe(const char *s, int *out)
 
 	i = 0;
 	sign = 1 * negatif(s[i]);
-	if (c == '-' || c == '+')
+	if (s[i] == '-' || s[i] == '+')
 		i++;
 	if (!s[i])
 		return (0);
