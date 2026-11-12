@@ -186,7 +186,7 @@ void	pb(t_ctx *c)
 
 *Toute les fonctions de swap avec ma fonction pure swap_case*
 
-/* ***************** ops/ops_push.c *********************** *\
+/* ***************** ops/ops_swap.c *********************** *\
 
 void	sa(t_ctx *c)
 void	sb(t_ctx *c)
